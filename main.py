@@ -2,6 +2,17 @@ import customtkinter as ctk
 import tkinter as tk
 from PIL import Image, ImageTk, ImageFont
 import os
+import webbrowser
+import sys
+
+def resource_path(relative_path):
+    """Get absolute path to resource, works for dev and for PyInstaller"""
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
 # Configure CustomTkinter color theme
 BLACK = "#000000"
@@ -18,14 +29,23 @@ class ZyncApp(ctk.CTk):
         self.title("ZYNC")
         self.geometry("1000x600")
 
-        # Set window icon
-        icon_path = os.path.join("assets", "icon.png")
-        try:
-            icon_img = Image.open(icon_path)
-            icon_photo = ImageTk.PhotoImage(icon_img)
-            self.wm_iconphoto(True, icon_photo)
-        except Exception as e:
-            print(f"Failed to set window icon: {e}")
+        # Set window icon for Windows using .ico file
+        icon_ico_path = resource_path(os.path.join("assets", "icon.ico"))
+        if sys.platform.startswith("win") and os.path.exists(icon_ico_path):
+            try:
+                self.iconbitmap(icon_ico_path)
+            except Exception as e:
+                print(f"Failed to set .ico icon: {e}")
+
+        # (Optional) Set iconphoto for cross-platform support (uses PNG)
+        icon_png_path = resource_path(os.path.join("assets", "icon.png"))
+        if os.path.exists(icon_png_path):
+            try:
+                icon_img = Image.open(icon_png_path)
+                icon_photo = ImageTk.PhotoImage(icon_img)
+                self.wm_iconphoto(True, icon_photo)
+            except Exception as e:
+                print(f"Failed to set iconphoto: {e}")
         
         # Set theme and colors
         ctk.set_appearance_mode("dark")
@@ -41,21 +61,20 @@ class ZyncApp(ctk.CTk):
         # Create sidebar frame
         self.sidebar_frame = ctk.CTkFrame(self, width=200, corner_radius=0, fg_color=DARK_GRAY)
         self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
-        self.sidebar_frame.grid_rowconfigure(6, weight=1)
+        self.sidebar_frame.grid_rowconfigure(0, weight=1)
+        self.sidebar_frame.grid_columnconfigure(0, weight=1)
 
-        # Load and display logo
-        logo_path = os.path.join("assets", "icon.png")
+        # Sidebar inner frame for logo and main nav buttons
+        self.sidebar_inner = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
+        self.sidebar_inner.pack(side="top", fill="x", pady=(20, 0))
+
+        # Logo
+        logo_path = resource_path(os.path.join("assets", "icon.png"))
         logo_image = Image.open(logo_path)
-        # Resize the image to fit nicely in the sidebar
-        logo_image = logo_image.resize((160, 160), Image.Resampling.LANCZOS)
-        self.logo_image = ctk.CTkImage(light_image=logo_image, dark_image=logo_image, size=(160, 160))
-        
-        self.logo_label = ctk.CTkLabel(
-            self.sidebar_frame,
-            image=self.logo_image,
-            text=""  # No text, only image
-        )
-        self.logo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
+        logo_image = logo_image.resize((80, 80), Image.Resampling.LANCZOS)
+        self.logo_image = ctk.CTkImage(light_image=logo_image, dark_image=logo_image, size=(80, 80))
+        self.logo_label = ctk.CTkLabel(self.sidebar_inner, image=self.logo_image, text="")
+        self.logo_label.pack(pady=(0, 20))
 
         # Button style configuration
         button_config = {
@@ -67,46 +86,31 @@ class ZyncApp(ctk.CTk):
             "width": 160
         }
 
-        # Sidebar buttons
-        self.connect_button = ctk.CTkButton(
-            self.sidebar_frame,
-            text="Connect Device",
-            command=self.connect_device,
-            **button_config
-        )
-        self.connect_button.grid(row=1, column=0, padx=20, pady=10)
+        # Main navigation buttons in sidebar_inner
+        self.connect_button = ctk.CTkButton(self.sidebar_inner, text="Connect Device", command=self.connect_device, **button_config)
+        self.connect_button.pack(pady=5)
+        self.live_scan_button = ctk.CTkButton(self.sidebar_inner, text="Live Scan", command=self.live_scan, **button_config)
+        self.live_scan_button.pack(pady=5)
+        self.scan_logs_button = ctk.CTkButton(self.sidebar_inner, text="Scan Logs", command=self.scan_logs, **button_config)
+        self.scan_logs_button.pack(pady=5)
+        self.export_logs_button = ctk.CTkButton(self.sidebar_inner, text="Export Logs", command=self.export_logs, **button_config)
+        self.export_logs_button.pack(pady=5)
+        self.settings_button = ctk.CTkButton(self.sidebar_inner, text="Settings", command=self.open_settings, **button_config)
+        self.settings_button.pack(pady=5)
+        self.device_info_button = ctk.CTkButton(self.sidebar_inner, text="Device Info", command=self.open_device_info, **button_config)
+        self.device_info_button.pack(pady=5)
+        self.terms_button = ctk.CTkButton(self.sidebar_inner, text="Terms and Conditions", command=self.open_terms, **button_config)
+        self.terms_button.pack(pady=5)
 
-        self.live_scan_button = ctk.CTkButton(
-            self.sidebar_frame,
-            text="Live Scan",
-            command=self.live_scan,
-            **button_config
-        )
-        self.live_scan_button.grid(row=2, column=0, padx=20, pady=10)
+        # Spacer frame to push bottom buttons down
+        self.spacer = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent", height=20)
+        self.spacer.pack(expand=True, fill="both")
 
-        self.scan_logs_button = ctk.CTkButton(
-            self.sidebar_frame,
-            text="Scan Logs",
-            command=self.scan_logs,
-            **button_config
-        )
-        self.scan_logs_button.grid(row=3, column=0, padx=20, pady=10)
-
-        self.export_logs_button = ctk.CTkButton(
-            self.sidebar_frame,
-            text="Export Logs",
-            command=self.export_logs,
-            **button_config
-        )
-        self.export_logs_button.grid(row=4, column=0, padx=20, pady=10)
-
-        self.settings_button = ctk.CTkButton(
-            self.sidebar_frame,
-            text="Settings",
-            command=self.open_settings,
-            **button_config
-        )
-        self.settings_button.grid(row=5, column=0, padx=20, pady=10)
+        # Bottom buttons
+        self.about_button = ctk.CTkButton(self.sidebar_frame, text="About Us", command=self.open_about, **button_config)
+        self.about_button.pack(pady=5, padx=20)
+        self.github_button = ctk.CTkButton(self.sidebar_frame, text="GitHub Repo", command=self.open_github, **button_config)
+        self.github_button.pack(pady=(5, 20), padx=20)
 
         # Main content frame
         self.main_frame = ctk.CTkFrame(self, fg_color=BLACK, corner_radius=0)
@@ -114,7 +118,7 @@ class ZyncApp(ctk.CTk):
 
         # Load custom font
         try:
-            font_path = os.path.join("assets", "Barlow-Black.ttf")
+            font_path = resource_path(os.path.join("assets", "Barlow-Black.ttf"))
             custom_font = ctk.CTkFont(family="Barlow Black", size=48, weight="bold")
             if not os.path.exists(font_path):
                 raise FileNotFoundError
@@ -158,6 +162,21 @@ class ZyncApp(ctk.CTk):
     def open_settings(self):
         # Placeholder for settings functionality
         pass
+
+    def open_device_info(self):
+        # Placeholder for Device Info functionality
+        pass
+
+    def open_terms(self):
+        # Placeholder for Terms and Conditions functionality
+        pass
+
+    def open_about(self):
+        # Placeholder for About Us functionality
+        pass
+
+    def open_github(self):
+        webbrowser.open_new_tab("https://github.com/yourusername/your-repo")
 
 if __name__ == "__main__":
     app = ZyncApp()
