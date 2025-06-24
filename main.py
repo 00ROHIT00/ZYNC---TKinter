@@ -4,6 +4,7 @@ from PIL import Image, ImageTk, ImageFont, ImageDraw
 import os
 import sys
 import webbrowser
+import json
 
 def resource_path(relative_path):
     """Get absolute path to resource, works for dev and for PyInstaller"""
@@ -14,13 +15,40 @@ def resource_path(relative_path):
         base_path = os.path.abspath(".")
     return os.path.join(base_path, relative_path)
 
-# Minimalist Color Scheme
-BG = "#111111"        # Almost black
-SURFACE = "#181818"   # Slightly lighter black
-ACCENT = "#32E6E2"    # Cyan
-GRAY = "#808080"      # Medium gray for better readability
-WHITE = "#ffffff"     # Pure white
-HOVER = "#222222"     # Hover state
+# Settings file path
+SETTINGS_FILE = resource_path("settings.json")
+
+# Minimalist Color Scheme - Dark Theme
+COLORS = {
+    "dark": {
+        "BG": "#111111",        # Almost black
+        "SURFACE": "#181818",   # Slightly lighter black
+        "ACCENT": "#32E6E2",    # Cyan
+        "GRAY": "#808080",      # Medium gray
+        "WHITE": "#ffffff",     # Pure white
+        "HOVER": "#222222",     # Hover state
+        "TEXT": "#ffffff",      # Text color
+        "TEXT_SECONDARY": "#808080"  # Secondary text
+    },
+    "light": {
+        "BG": "#F5F5F7",        # Very light gray
+        "SURFACE": "#FFFFFF",   # White
+        "ACCENT": "#2BA8A5",    # Darker cyan (for better contrast)
+        "GRAY": "#6E6E73",      # Medium gray
+        "WHITE": "#000000",     # Used for main text in light mode
+        "HOVER": "#E8E8E8",     # Light gray hover
+        "TEXT": "#000000",      # Text color
+        "TEXT_SECONDARY": "#6E6E73"  # Secondary text
+    }
+}
+
+# Initialize with dark theme
+BG = COLORS["dark"]["BG"]
+SURFACE = COLORS["dark"]["SURFACE"]
+ACCENT = COLORS["dark"]["ACCENT"]
+GRAY = COLORS["dark"]["GRAY"]
+WHITE = COLORS["dark"]["WHITE"]
+HOVER = COLORS["dark"]["HOVER"]
 
 def create_icon(icon_type):
     """Create a simple icon using PIL drawing."""
@@ -57,25 +85,257 @@ class ZyncApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
+        # Load saved settings or use defaults
+        self.settings = self.load_settings()
+        
+        # Initialize settings with saved values
+        self.current_theme = self.settings.get("theme", "Dark")
+        self.current_font_size = self.settings.get("font_size", "Medium")
+        self.font_sizes = {
+            "Small": {
+                "title": 20,
+                "header": 16,
+                "normal": 12,
+                "small": 11
+            },
+            "Medium": {
+                "title": 24,
+                "header": 18,
+                "normal": 14,
+                "small": 13
+            },
+            "Large": {
+                "title": 28,
+                "header": 20,
+                "normal": 16,
+                "small": 15
+            }
+        }
+
+        # Load both light and dark logos
+        self.load_logos()
+
+        # Set theme before creating any widgets
+        self.apply_theme(self.current_theme, save_settings=False)
+
         # Configure window
         self.title("ZYNC")
-        self.geometry("1100x750")
+        self.geometry("1920x1080")
         
-        # Set window icon
-        icon_ico_path = resource_path(os.path.join("assets", "icon.ico"))
-        if sys.platform.startswith("win") and os.path.exists(icon_ico_path):
-            try:
-                self.iconbitmap(icon_ico_path)
-            except Exception as e:
-                print(f"Failed to set .ico icon: {e}")
-
-        # Set theme
-        ctk.set_appearance_mode("dark")
-        self._set_appearance_mode("dark")
-        self.configure(fg_color=BG)
+        # Center the window on screen
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        window_width = 1920
+        window_height = 1080
+        
+        # Calculate position x and y coordinates
+        x = (screen_width/2) - (window_width/2)
+        y = (screen_height/2) - (window_height/2)
+        self.geometry(f"{window_width}x{window_height}+{int(x)}+{int(y)}")
+        
+        # Set window icon based on theme
+        self.update_window_icon()
 
         # Create main layout
         self.setup_layout()
+
+    def load_settings(self):
+        """Load settings from file"""
+        try:
+            if os.path.exists(SETTINGS_FILE):
+                with open(SETTINGS_FILE, 'r') as f:
+                    return json.load(f)
+        except Exception as e:
+            print(f"Error loading settings: {e}")
+        return {}  # Return empty dict if no settings or error
+
+    def save_settings(self):
+        """Save current settings to file"""
+        settings = {
+            "theme": self.current_theme,
+            "font_size": self.current_font_size
+        }
+        try:
+            with open(SETTINGS_FILE, 'w') as f:
+                json.dump(settings, f)
+        except Exception as e:
+            print(f"Error saving settings: {e}")
+
+    def load_logos(self):
+        """Load both light and dark versions of the logo"""
+        # Load dark logo (white)
+        dark_logo_path = resource_path(os.path.join("assets", "icon.png"))
+        dark_logo_image = Image.open(dark_logo_path)
+        dark_logo_image = dark_logo_image.resize((40, 40), Image.Resampling.LANCZOS)
+        self.dark_logo = ctk.CTkImage(light_image=dark_logo_image, dark_image=dark_logo_image, size=(40, 40))
+
+        # Load light logo (black)
+        light_logo_path = resource_path(os.path.join("assets", "black.png"))
+        light_logo_image = Image.open(light_logo_path)
+        light_logo_image = light_logo_image.resize((40, 40), Image.Resampling.LANCZOS)
+        self.light_logo = ctk.CTkImage(light_image=light_logo_image, dark_image=light_logo_image, size=(40, 40))
+
+    def update_window_icon(self):
+        """Update the window icon based on current theme"""
+        icon_path = resource_path(os.path.join("assets", 
+            "black.ico" if self.current_theme == "Light" else "icon.ico"))
+        if sys.platform.startswith("win") and os.path.exists(icon_path):
+            try:
+                self.iconbitmap(icon_path)
+            except Exception as e:
+                print(f"Failed to set .ico icon: {e}")
+
+    def apply_theme(self, theme, save_settings=True):
+        """Apply the selected theme and optionally save settings"""
+        self.current_theme = theme
+        if theme == "System":
+            # Try to detect system theme
+            try:
+                import darkdetect
+                theme = "Dark" if darkdetect.isDark() else "Light"
+            except ImportError:
+                theme = "Dark"  # Default to Dark if can't detect
+
+        # Update global color variables
+        theme_lower = theme.lower()
+        global BG, SURFACE, ACCENT, GRAY, WHITE, HOVER
+        BG = COLORS[theme_lower]["BG"]
+        SURFACE = COLORS[theme_lower]["SURFACE"]
+        ACCENT = COLORS[theme_lower]["ACCENT"]
+        GRAY = COLORS[theme_lower]["GRAY"]
+        WHITE = COLORS[theme_lower]["WHITE"]
+        HOVER = COLORS[theme_lower]["HOVER"]
+        
+        # Apply theme to CustomTkinter
+        if theme == "Light":
+            ctk.set_appearance_mode("light")
+            self._set_appearance_mode("light")
+        else:  # Dark theme
+            ctk.set_appearance_mode("dark")
+            self._set_appearance_mode("dark")
+            
+        # Update the colors of existing widgets
+        self.configure(fg_color=BG)
+        if hasattr(self, 'container'):
+            self.container.configure(fg_color=BG)
+            self._update_widget_colors(self.container)
+            
+        # Update logo if it exists
+        if hasattr(self, 'logo_label'):
+            self.logo_label.configure(
+                image=self.light_logo if theme == "Light" else self.dark_logo
+            )
+            
+        # Update window icon
+        self.update_window_icon()
+            
+        # Save settings if requested
+        if save_settings:
+            self.save_settings()
+
+    def _update_widget_colors(self, widget):
+        """Recursively update colors of all widgets"""
+        theme_lower = self.current_theme.lower()
+        
+        try:
+            if isinstance(widget, ctk.CTkFrame):
+                current_color = widget.cget("fg_color")
+                if current_color in [COLORS["dark"]["SURFACE"], COLORS["light"]["SURFACE"]]:
+                    widget.configure(fg_color=SURFACE)
+                elif current_color in [COLORS["dark"]["BG"], COLORS["light"]["BG"], "transparent"]:
+                    widget.configure(fg_color=BG if current_color != "transparent" else "transparent")
+                    
+            elif isinstance(widget, ctk.CTkLabel):
+                current_color = widget.cget("text_color")
+                if current_color in [COLORS["dark"]["WHITE"], COLORS["light"]["WHITE"]]:
+                    widget.configure(text_color=WHITE)
+                elif current_color in [COLORS["dark"]["GRAY"], COLORS["light"]["GRAY"]]:
+                    widget.configure(text_color=GRAY)
+                elif current_color in [COLORS["dark"]["ACCENT"], COLORS["light"]["ACCENT"]]:
+                    widget.configure(text_color=ACCENT)
+                    
+            elif isinstance(widget, ctk.CTkButton):
+                current_color = widget.cget("fg_color")
+                if current_color in [COLORS["dark"]["SURFACE"], COLORS["light"]["SURFACE"]]:
+                    widget.configure(
+                        fg_color=SURFACE,
+                        hover_color=HOVER,
+                        text_color=WHITE
+                    )
+                elif current_color == ACCENT:
+                    widget.configure(
+                        hover_color="#2BC4C1" if theme_lower == "dark" else "#248F8C"
+                    )
+                    
+            elif isinstance(widget, ctk.CTkOptionMenu):
+                widget.configure(
+                    fg_color=SURFACE,
+                    button_color=ACCENT,
+                    button_hover_color=HOVER,
+                    text_color=WHITE
+                )
+                
+            elif isinstance(widget, ctk.CTkSwitch):
+                widget.configure(
+                    progress_color=ACCENT,
+                    button_color=WHITE,
+                    button_hover_color=GRAY,
+                    fg_color=SURFACE
+                )
+                
+            elif isinstance(widget, ctk.CTkScrollableFrame):
+                widget.configure(fg_color="transparent")
+                
+        except Exception as e:
+            print(f"Error updating widget colors: {e}")
+            
+        # Recursively update child widgets
+        for child in widget.winfo_children():
+            self._update_widget_colors(child)
+
+    def apply_font_size(self, size, save_settings=True):
+        """Apply the selected font size and optionally save settings"""
+        self.current_font_size = size
+        sizes = self.font_sizes[size]
+        
+        # Update all text elements that exist
+        if hasattr(self, 'content_frame'):
+            # Recursively update all labels and buttons
+            self._update_widget_fonts(self)
+            
+        # Store the size for new elements
+        self.current_font_sizes = sizes
+        
+        # Save settings if requested
+        if save_settings:
+            self.save_settings()
+
+    def _update_widget_fonts(self, widget):
+        """Recursively update fonts of all widgets"""
+        sizes = self.font_sizes[self.current_font_size]
+        
+        if isinstance(widget, ctk.CTkLabel):
+            # Determine the font size based on the widget's role
+            if widget.cget("text") == "ZYNC":  # Main title
+                widget.configure(font=ctk.CTkFont(size=sizes["title"], weight="bold"))
+            elif widget.cget("text") == "SETTINGS":  # Page header
+                widget.configure(font=ctk.CTkFont(size=sizes["title"], weight="bold"))
+            elif widget.cget("text") in ["General", "Scan Settings", "Export Settings", "Developer Options (ADVANCED)"]:  # Section headers
+                widget.configure(font=ctk.CTkFont(size=sizes["header"], weight="bold"))
+            else:  # Normal text
+                current_font = widget.cget("font")
+                is_bold = current_font.weight == "bold" if hasattr(current_font, 'weight') else False
+                widget.configure(font=ctk.CTkFont(size=sizes["normal"], weight="bold" if is_bold else "normal"))
+        
+        elif isinstance(widget, ctk.CTkButton):
+            widget.configure(font=ctk.CTkFont(size=sizes["normal"]))
+        
+        elif isinstance(widget, ctk.CTkOptionMenu):
+            widget.configure(font=ctk.CTkFont(size=sizes["normal"]))
+        
+        # Recursively update child widgets
+        for child in widget.winfo_children():
+            self._update_widget_fonts(child)
 
     def setup_layout(self):
         # Main container
@@ -83,17 +343,17 @@ class ZyncApp(ctk.CTk):
         self.container.pack(expand=True, fill="both", padx=40, pady=30)
 
         # Top bar with logo and status
-        self.create_top_bar()
+        self.top_bar = self.create_top_bar()
         
         # Content frame that will switch between views
         self.content_frame = ctk.CTkFrame(self.container, fg_color="transparent")
         self.content_frame.pack(expand=True, fill="both")
         
+        # Bottom bar with utilities
+        self.bottom_bar = self.create_bottom_bar()
+        
         # Initially show the action grid
         self.show_action_grid()
-        
-        # Bottom bar with utilities
-        self.create_bottom_bar()
 
     def create_top_bar(self):
         # Top bar container
@@ -105,14 +365,13 @@ class ZyncApp(ctk.CTk):
         logo_frame = ctk.CTkFrame(top_bar, fg_color="transparent")
         logo_frame.pack(side="left", fill="y")
 
-        # Load logo
-        logo_path = resource_path(os.path.join("assets", "icon.png"))
-        logo_image = Image.open(logo_path)
-        logo_image = logo_image.resize((40, 40), Image.Resampling.LANCZOS)
-        self.logo_image = ctk.CTkImage(light_image=logo_image, dark_image=logo_image, size=(40, 40))
-        
-        logo_label = ctk.CTkLabel(logo_frame, image=self.logo_image, text="")
-        logo_label.pack(side="left")
+        # Logo label (will be updated with theme changes)
+        self.logo_label = ctk.CTkLabel(
+            logo_frame,
+            image=self.dark_logo if self.current_theme == "Dark" else self.light_logo,
+            text=""
+        )
+        self.logo_label.pack(side="left")
 
         # Title with custom font
         try:
@@ -138,11 +397,67 @@ class ZyncApp(ctk.CTk):
         )
         self.status_label.pack(side="right", padx=10)
 
+        return top_bar
+
+    def create_bottom_bar(self):
+        # Bottom utilities bar
+        bottom_frame = ctk.CTkFrame(self.container, fg_color="transparent", height=50)
+        bottom_frame.pack(fill="x", pady=(20, 0))
+        bottom_frame.pack_propagate(False)
+
+        # Utility buttons configuration
+        button_config = {
+            "fg_color": "transparent",
+            "hover_color": "#1A1A1A",  # Very subtle dark hover color
+            "text_color": GRAY,
+            "font": ctk.CTkFont(size=14, weight="bold"),
+            "height": 32,
+            "corner_radius": 6
+        }
+
+        # Left side buttons
+        left_frame = ctk.CTkFrame(bottom_frame, fg_color="transparent")
+        left_frame.pack(side="left")
+
+        utilities = [
+            ("Settings", self.open_settings),
+            ("Device Info", self.open_device_info),
+            ("Terms & Conditions", self.open_terms)
+        ]
+
+        for text, command in utilities:
+            btn = ctk.CTkButton(left_frame, text=text, command=command, **button_config)
+            btn.pack(side="left", padx=5)
+            # Add hover effect
+            btn.bind("<Enter>", lambda e, b=btn: b.configure(text_color=WHITE))
+            btn.bind("<Leave>", lambda e, b=btn: b.configure(text_color=GRAY))
+
+        # Right side buttons
+        right_frame = ctk.CTkFrame(bottom_frame, fg_color="transparent")
+        right_frame.pack(side="right")
+
+        about_btn = ctk.CTkButton(right_frame, text="About", command=self.open_about, **button_config)
+        about_btn.pack(side="left", padx=5)
+        about_btn.bind("<Enter>", lambda e: about_btn.configure(text_color=WHITE))
+        about_btn.bind("<Leave>", lambda e: about_btn.configure(text_color=GRAY))
+
+        github_btn = ctk.CTkButton(right_frame, text="GitHub", command=self.open_github, **button_config)
+        github_btn.pack(side="left", padx=5)
+        github_btn.bind("<Enter>", lambda e: github_btn.configure(text_color=WHITE))
+        github_btn.bind("<Leave>", lambda e: github_btn.configure(text_color=GRAY))
+
+        return bottom_frame
+
     def show_action_grid(self):
         # Clear current content
         for widget in self.content_frame.winfo_children():
             widget.destroy()
             
+        # Show dashboard bars in correct order
+        self.top_bar.pack(in_=self.container, fill="x", pady=(0, 40), after=None)
+        self.content_frame.pack(in_=self.container, expand=True, fill="both", after=self.top_bar)
+        self.bottom_bar.pack(in_=self.container, fill="x", pady=(20, 0), after=self.content_frame)
+        
         # Main actions grid
         actions_frame = ctk.CTkFrame(self.content_frame, fg_color="transparent")
         actions_frame.pack(expand=True, fill="both", pady=20)
@@ -227,53 +542,6 @@ class ZyncApp(ctk.CTk):
         desc.bind("<Button-1>", lambda e: command())
         desc.configure(cursor="hand2")
 
-    def create_bottom_bar(self):
-        # Bottom utilities bar
-        bottom_frame = ctk.CTkFrame(self.container, fg_color="transparent", height=50)
-        bottom_frame.pack(fill="x", pady=(20, 0))
-        bottom_frame.pack_propagate(False)
-
-        # Utility buttons configuration
-        button_config = {
-            "fg_color": "transparent",
-            "hover_color": "#1A1A1A",  # Very subtle dark hover color
-            "text_color": GRAY,
-            "font": ctk.CTkFont(size=14, weight="bold"),
-            "height": 32,
-            "corner_radius": 6
-        }
-
-        # Left side buttons
-        left_frame = ctk.CTkFrame(bottom_frame, fg_color="transparent")
-        left_frame.pack(side="left")
-
-        utilities = [
-            ("Settings", self.open_settings),
-            ("Device Info", self.open_device_info),
-            ("Terms & Conditions", self.open_terms)
-        ]
-
-        for text, command in utilities:
-            btn = ctk.CTkButton(left_frame, text=text, command=command, **button_config)
-            btn.pack(side="left", padx=5)
-            # Add hover effect
-            btn.bind("<Enter>", lambda e, b=btn: b.configure(text_color=WHITE))
-            btn.bind("<Leave>", lambda e, b=btn: b.configure(text_color=GRAY))
-
-        # Right side buttons
-        right_frame = ctk.CTkFrame(bottom_frame, fg_color="transparent")
-        right_frame.pack(side="right")
-
-        about_btn = ctk.CTkButton(right_frame, text="About", command=self.open_about, **button_config)
-        about_btn.pack(side="left", padx=5)
-        about_btn.bind("<Enter>", lambda e: about_btn.configure(text_color=WHITE))
-        about_btn.bind("<Leave>", lambda e: about_btn.configure(text_color=GRAY))
-
-        github_btn = ctk.CTkButton(right_frame, text="GitHub", command=self.open_github, **button_config)
-        github_btn.pack(side="left", padx=5)
-        github_btn.bind("<Enter>", lambda e: github_btn.configure(text_color=WHITE))
-        github_btn.bind("<Leave>", lambda e: github_btn.configure(text_color=GRAY))
-
     def connect_device(self):
         self.status_label.configure(text="●  Connecting...", text_color=ACCENT)
 
@@ -287,7 +555,7 @@ class ZyncApp(ctk.CTk):
         pass
 
     def open_settings(self):
-        pass
+        self.show_settings()
 
     def open_device_info(self):
         self.show_device_info()
@@ -470,7 +738,7 @@ For questions or support, please contact:
         logo_frame.pack(fill="x", pady=(0, 20))
         
         # Logo
-        logo_label = ctk.CTkLabel(logo_frame, image=self.logo_image, text="")
+        logo_label = ctk.CTkLabel(logo_frame, image=self.logo_label, text="")
         logo_label.pack(side="left")
         
         # Title with custom font
@@ -625,17 +893,34 @@ For questions or support, please contact:
         continue_button.pack(side="right", padx=5)
 
     def show_device_info(self):
+        # Hide dashboard bars
+        self.top_bar.pack_forget()
+        self.bottom_bar.pack_forget()
+        
         # Clear current content
         for widget in self.content_frame.winfo_children():
             widget.destroy()
             
-        # Main container with some padding
+        # Main container without padding to use full space
         main_container = ctk.CTkFrame(self.content_frame, fg_color="transparent")
-        main_container.pack(expand=True, fill="both", padx=40, pady=30)
+        main_container.pack(expand=True, fill="both")
         
         # Header
         header_frame = ctk.CTkFrame(main_container, fg_color="transparent")
-        header_frame.pack(fill="x", pady=(0, 30))
+        header_frame.pack(fill="x", padx=40, pady=30)
+
+        # Back button
+        back_button = ctk.CTkButton(
+            header_frame,
+            text="← Back",
+            command=self.show_action_grid,
+            fg_color=SURFACE,
+            hover_color=HOVER,
+            text_color=WHITE,
+            height=32,
+            width=100
+        )
+        back_button.pack(side="left")
         
         header_title = ctk.CTkLabel(
             header_frame,
@@ -643,7 +928,7 @@ For questions or support, please contact:
             font=ctk.CTkFont(size=24, weight="bold"),
             text_color=WHITE
         )
-        header_title.pack(side="left")
+        header_title.pack(side="left", padx=20)
         
         # Status indicator
         status_frame = ctk.CTkFrame(header_frame, fg_color=SURFACE, corner_radius=10)
@@ -665,9 +950,9 @@ For questions or support, please contact:
         )
         status_text.pack(side="left", padx=(0, 15), pady=8)
         
-        # Content area with sections
+        # Content area with sections - now using full width
         content_frame = ctk.CTkFrame(main_container, fg_color=SURFACE, corner_radius=15)
-        content_frame.pack(expand=True, fill="both")
+        content_frame.pack(expand=True, fill="both", padx=40, pady=(0, 30))
         
         # Left column (60% width)
         left_col = ctk.CTkFrame(content_frame, fg_color="transparent")
@@ -747,6 +1032,196 @@ For questions or support, please contact:
                 anchor="e"
             )
             value_label.pack(side="right", padx=15)
+
+    def show_settings(self):
+        # Hide dashboard bars
+        self.top_bar.pack_forget()
+        self.bottom_bar.pack_forget()
+        
+        # Clear current content
+        for widget in self.content_frame.winfo_children():
+            widget.destroy()
+            
+        # Main container without padding to use full space
+        main_container = ctk.CTkFrame(self.content_frame, fg_color="transparent")
+        main_container.pack(expand=True, fill="both")
+        
+        # Header
+        header_frame = ctk.CTkFrame(main_container, fg_color="transparent")
+        header_frame.pack(fill="x", padx=40, pady=30)
+
+        # Back button
+        back_button = ctk.CTkButton(
+            header_frame,
+            text="← Back",
+            command=self.show_action_grid,
+            fg_color=SURFACE,
+            hover_color=HOVER,
+            text_color=WHITE,
+            height=32,
+            width=100
+        )
+        back_button.pack(side="left")
+        
+        # Title (centered)
+        header_title = ctk.CTkLabel(
+            header_frame,
+            text="SETTINGS",
+            font=ctk.CTkFont(size=24, weight="bold"),
+            text_color=WHITE
+        )
+        header_title.pack(expand=True, pady=(0, 0))
+        
+        # Settings content
+        content_frame = ctk.CTkFrame(main_container, fg_color=SURFACE, corner_radius=15)
+        content_frame.pack(expand=True, fill="both", padx=40, pady=(0, 30))
+        
+        # Settings sections container with scrolling
+        settings_container = ctk.CTkScrollableFrame(
+            content_frame,
+            fg_color="transparent",
+            corner_radius=0
+        )
+        settings_container.pack(expand=True, fill="both", padx=25, pady=25)
+
+        # General Settings
+        self.create_settings_section(settings_container, "General", [
+            ("App Theme", "dropdown", ["Dark", "Light", "System"]),
+            ("Font Size", "dropdown", ["Small", "Medium", "Large"]),
+            ("Default Save Path", "path", "Browse...")
+        ])
+        
+        # Scan Settings
+        self.create_settings_section(settings_container, "Scan Settings", [
+            ("Scan Interval", "dropdown", ["5s", "10s", "30s", "1m", "5m"]),
+            ("Scan Depth", "dropdown", ["Basic", "Standard", "Deep"]),
+            ("Ignore Duplicate SSIDs", "switch", None),
+            ("Alert for Insecure WiFi", "switch", None)
+        ])
+        
+        # Export Settings
+        self.create_settings_section(settings_container, "Export Settings", [
+            ("Log Format", "dropdown", ["TXT", "CSV", "JSON"]),
+            ("Include Device Info in Logs", "switch", None)
+        ])
+        
+        # Developer Options
+        self.create_settings_section(settings_container, "Developer Options (ADVANCED)", [
+            ("Verbose Scan Output", "switch", None),
+            ("Test Bluetooth Connection", "button", "Test")
+        ])
+
+    def create_settings_section(self, parent, title, settings):
+        # Section container
+        section = ctk.CTkFrame(parent, fg_color="transparent")
+        section.pack(fill="x", pady=(0, 25))
+        
+        # Section title
+        title_label = ctk.CTkLabel(
+            section,
+            text=title,
+            font=ctk.CTkFont(size=self.font_sizes[self.current_font_size]["header"], weight="bold"),
+            text_color=ACCENT
+        )
+        title_label.pack(anchor="w", pady=(0, 15))
+        
+        # Settings items
+        for setting_name, setting_type, setting_options in settings:
+            item_frame = ctk.CTkFrame(section, fg_color=BG, corner_radius=8, height=45)
+            item_frame.pack(fill="x", pady=4)
+            item_frame.pack_propagate(False)
+            
+            # Setting name
+            name_label = ctk.CTkLabel(
+                item_frame,
+                text=setting_name,
+                font=ctk.CTkFont(size=self.font_sizes[self.current_font_size]["normal"]),
+                text_color=WHITE,
+                anchor="w"
+            )
+            name_label.pack(side="left", padx=15, fill="x", expand=True)
+            
+            # Setting control
+            if setting_type == "dropdown":
+                if setting_name == "App Theme":
+                    control = ctk.CTkOptionMenu(
+                        item_frame,
+                        values=setting_options,
+                        fg_color=SURFACE,
+                        button_color=ACCENT,
+                        button_hover_color="#2BC4C1",
+                        text_color=WHITE,
+                        width=120,
+                        command=self.apply_theme,
+                        font=ctk.CTkFont(size=self.font_sizes[self.current_font_size]["normal"])
+                    )
+                    control.set(self.current_theme)
+                elif setting_name == "Font Size":
+                    control = ctk.CTkOptionMenu(
+                        item_frame,
+                        values=setting_options,
+                        fg_color=SURFACE,
+                        button_color=ACCENT,
+                        button_hover_color="#2BC4C1",
+                        text_color=WHITE,
+                        width=120,
+                        command=self.apply_font_size,
+                        font=ctk.CTkFont(size=self.font_sizes[self.current_font_size]["normal"])
+                    )
+                    control.set(self.current_font_size)
+                else:
+                    control = ctk.CTkOptionMenu(
+                        item_frame,
+                        values=setting_options,
+                        fg_color=SURFACE,
+                        button_color=ACCENT,
+                        button_hover_color="#2BC4C1",
+                        text_color=WHITE,
+                        width=120,
+                        font=ctk.CTkFont(size=self.font_sizes[self.current_font_size]["normal"])
+                    )
+                    control.set(setting_options[0])
+                control.pack(side="right", padx=15)
+            
+            elif setting_type == "switch":
+                control = ctk.CTkSwitch(
+                    item_frame,
+                    text="",
+                    progress_color=ACCENT,
+                    button_color=WHITE,
+                    button_hover_color="#CCCCCC",
+                    width=46
+                )
+                control.pack(side="right", padx=15)
+            
+            elif setting_type == "path":
+                def browse_path():
+                    # This is a placeholder for the file dialog functionality
+                    pass
+                
+                control = ctk.CTkButton(
+                    item_frame,
+                    text=setting_options,
+                    command=browse_path,
+                    fg_color=SURFACE,
+                    hover_color=HOVER,
+                    text_color=WHITE,
+                    width=100,
+                    height=28
+                )
+                control.pack(side="right", padx=15)
+            
+            elif setting_type == "button":
+                control = ctk.CTkButton(
+                    item_frame,
+                    text=setting_options,
+                    fg_color=SURFACE,
+                    hover_color=HOVER,
+                    text_color=WHITE,
+                    width=100,
+                    height=28
+                )
+                control.pack(side="right", padx=15)
 
 if __name__ == "__main__":
     app = ZyncApp()
