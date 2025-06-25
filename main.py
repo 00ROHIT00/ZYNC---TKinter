@@ -5,6 +5,8 @@ import os
 import sys
 import webbrowser
 import json
+import subprocess
+import time
 
 def resource_path(relative_path):
     """Get absolute path to resource, works for dev and for PyInstaller"""
@@ -91,6 +93,7 @@ class ZyncApp(ctk.CTk):
         # Initialize settings with saved values
         self.current_theme = self.settings.get("theme", "Dark")
         self.current_font_size = self.settings.get("font_size", "Medium")
+        self.default_save_path = self.settings.get("save_path", os.path.expanduser("~/Documents"))
         self.font_sizes = {
             "Small": {
                 "title": 20,
@@ -153,7 +156,8 @@ class ZyncApp(ctk.CTk):
         """Save current settings to file"""
         settings = {
             "theme": self.current_theme,
-            "font_size": self.current_font_size
+            "font_size": self.current_font_size,
+            "save_path": self.default_save_path
         }
         try:
             with open(SETTINGS_FILE, 'w') as f:
@@ -320,7 +324,7 @@ class ZyncApp(ctk.CTk):
                 widget.configure(font=ctk.CTkFont(size=sizes["title"], weight="bold"))
             elif widget.cget("text") == "SETTINGS":  # Page header
                 widget.configure(font=ctk.CTkFont(size=sizes["title"], weight="bold"))
-            elif widget.cget("text") in ["General", "Scan Settings", "Export Settings", "Developer Options (ADVANCED)"]:  # Section headers
+            elif widget.cget("text") in ["General", "Scan Settings", "Export Settings", "Developer Options (Advanced)"]:  # Section headers
                 widget.configure(font=ctk.CTkFont(size=sizes["header"], weight="bold"))
             else:  # Normal text
                 current_font = widget.cget("font")
@@ -552,7 +556,25 @@ class ZyncApp(ctk.CTk):
         pass
 
     def export_logs(self):
-        pass
+        """Export logs and show a notification."""
+        # Here you would implement the actual log export functionality
+        
+        def open_save_folder():
+            """Open the default save folder in file explorer."""
+            if os.path.exists(self.default_save_path):
+                if sys.platform == "win32":
+                    os.startfile(self.default_save_path)
+                elif sys.platform == "darwin":  # macOS
+                    subprocess.run(["open", self.default_save_path])
+                else:  # Linux
+                    subprocess.run(["xdg-open", self.default_save_path])
+        
+        # Show toast with "Open Folder" button
+        self.show_toast(
+            f"Log saved to:\n{self.default_save_path}",
+            "Open Folder",
+            open_save_folder
+        )
 
     def open_settings(self):
         self.show_settings()
@@ -1106,7 +1128,7 @@ For questions or support, please contact:
         ])
         
         # Developer Options
-        self.create_settings_section(settings_container, "Developer Options (ADVANCED)", [
+        self.create_settings_section(settings_container, "Developer Options (Advanced)", [
             ("Verbose Scan Output", "switch", None),
             ("Test Bluetooth Connection", "button", "Test")
         ])
@@ -1127,80 +1149,59 @@ For questions or support, please contact:
         
         # Settings items
         for setting_name, setting_type, setting_options in settings:
-            item_frame = ctk.CTkFrame(section, fg_color=BG, corner_radius=8, height=45)
-            item_frame.pack(fill="x", pady=4)
-            item_frame.pack_propagate(False)
+            item_frame = ctk.CTkFrame(section, fg_color=BG, corner_radius=8)
             
-            # Setting name
-            name_label = ctk.CTkLabel(
-                item_frame,
-                text=setting_name,
-                font=ctk.CTkFont(size=self.font_sizes[self.current_font_size]["normal"]),
-                text_color=WHITE,
-                anchor="w"
-            )
-            name_label.pack(side="left", padx=15, fill="x", expand=True)
-            
-            # Setting control
-            if setting_type == "dropdown":
-                if setting_name == "App Theme":
-                    control = ctk.CTkOptionMenu(
-                        item_frame,
-                        values=setting_options,
-                        fg_color=SURFACE,
-                        button_color=ACCENT,
-                        button_hover_color="#2BC4C1",
-                        text_color=WHITE,
-                        width=120,
-                        command=self.apply_theme,
-                        font=ctk.CTkFont(size=self.font_sizes[self.current_font_size]["normal"])
-                    )
-                    control.set(self.current_theme)
-                elif setting_name == "Font Size":
-                    control = ctk.CTkOptionMenu(
-                        item_frame,
-                        values=setting_options,
-                        fg_color=SURFACE,
-                        button_color=ACCENT,
-                        button_hover_color="#2BC4C1",
-                        text_color=WHITE,
-                        width=120,
-                        command=self.apply_font_size,
-                        font=ctk.CTkFont(size=self.font_sizes[self.current_font_size]["normal"])
-                    )
-                    control.set(self.current_font_size)
-                else:
-                    control = ctk.CTkOptionMenu(
-                        item_frame,
-                        values=setting_options,
-                        fg_color=SURFACE,
-                        button_color=ACCENT,
-                        button_hover_color="#2BC4C1",
-                        text_color=WHITE,
-                        width=120,
-                        font=ctk.CTkFont(size=self.font_sizes[self.current_font_size]["normal"])
-                    )
-                    control.set(setting_options[0])
-                control.pack(side="right", padx=15)
-            
-            elif setting_type == "switch":
-                control = ctk.CTkSwitch(
-                    item_frame,
-                    text="",
-                    progress_color=ACCENT,
-                    button_color=WHITE,
-                    button_hover_color="#CCCCCC",
-                    width=46
-                )
-                control.pack(side="right", padx=15)
-            
-            elif setting_type == "path":
-                def browse_path():
-                    # This is a placeholder for the file dialog functionality
-                    pass
+            if setting_name == "Default Save Path":
+                # Create a taller frame for the save path setting
+                item_frame.configure(height=70)
+                item_frame.pack(fill="x", pady=4)
+                item_frame.pack_propagate(False)
                 
-                control = ctk.CTkButton(
+                # Setting name at the top
+                name_label = ctk.CTkLabel(
                     item_frame,
+                    text=setting_name,
+                    font=ctk.CTkFont(size=self.font_sizes[self.current_font_size]["normal"]),
+                    text_color=WHITE,
+                    anchor="w"
+                )
+                name_label.pack(side="top", padx=15, pady=(8, 0), anchor="w")
+                
+                # Path display and browse button in a frame
+                path_frame = ctk.CTkFrame(item_frame, fg_color="transparent")
+                path_frame.pack(side="top", fill="x", padx=15, pady=(2, 8))
+                
+                # Path display (shortened if too long)
+                def shorten_path(path, max_length=40):
+                    if len(path) <= max_length:
+                        return path
+                    head, tail = os.path.split(path)
+                    if len(tail) > max_length/2:
+                        return f"...{tail[-int(max_length/2):]}"
+                    return f"{head[:int(max_length/2)]}...{tail}"
+                
+                self.path_label = ctk.CTkLabel(
+                    path_frame,
+                    text=shorten_path(self.default_save_path),
+                    font=ctk.CTkFont(size=self.font_sizes[self.current_font_size]["small"]),
+                    text_color=GRAY,
+                    anchor="w"
+                )
+                self.path_label.pack(side="left", fill="x", expand=True)
+                
+                # Browse button
+                def browse_path():
+                    path = tk.filedialog.askdirectory(
+                        initialdir=self.default_save_path,
+                        title="Select Default Save Location"
+                    )
+                    if path:  # User selected a path
+                        self.default_save_path = path
+                        self.path_label.configure(text=shorten_path(path))
+                        self.save_settings()
+                
+                browse_button = ctk.CTkButton(
+                    path_frame,
                     text=setting_options,
                     command=browse_path,
                     fg_color=SURFACE,
@@ -1209,19 +1210,182 @@ For questions or support, please contact:
                     width=100,
                     height=28
                 )
-                control.pack(side="right", padx=15)
-            
-            elif setting_type == "button":
-                control = ctk.CTkButton(
+                browse_button.pack(side="right", padx=(10, 0))
+                
+            else:
+                # Regular settings item
+                item_frame.configure(height=45)
+                item_frame.pack(fill="x", pady=4)
+                item_frame.pack_propagate(False)
+                
+                # Setting name
+                name_label = ctk.CTkLabel(
                     item_frame,
-                    text=setting_options,
-                    fg_color=SURFACE,
-                    hover_color=HOVER,
+                    text=setting_name,
+                    font=ctk.CTkFont(size=self.font_sizes[self.current_font_size]["normal"]),
                     text_color=WHITE,
-                    width=100,
-                    height=28
+                    anchor="w"
                 )
-                control.pack(side="right", padx=15)
+                name_label.pack(side="left", padx=15, fill="x", expand=True)
+                
+                # Setting control
+                if setting_type == "dropdown":
+                    if setting_name == "App Theme":
+                        control = ctk.CTkOptionMenu(
+                            item_frame,
+                            values=setting_options,
+                            fg_color=SURFACE,
+                            button_color=ACCENT,
+                            button_hover_color="#2BC4C1",
+                            text_color=WHITE,
+                            width=120,
+                            command=self.apply_theme,
+                            font=ctk.CTkFont(size=self.font_sizes[self.current_font_size]["normal"])
+                        )
+                        control.set(self.current_theme)
+                    elif setting_name == "Font Size":
+                        control = ctk.CTkOptionMenu(
+                            item_frame,
+                            values=setting_options,
+                            fg_color=SURFACE,
+                            button_color=ACCENT,
+                            button_hover_color="#2BC4C1",
+                            text_color=WHITE,
+                            width=120,
+                            command=self.apply_font_size,
+                            font=ctk.CTkFont(size=self.font_sizes[self.current_font_size]["normal"])
+                        )
+                        control.set(self.current_font_size)
+                    else:
+                        control = ctk.CTkOptionMenu(
+                            item_frame,
+                            values=setting_options,
+                            fg_color=SURFACE,
+                            button_color=ACCENT,
+                            button_hover_color="#2BC4C1",
+                            text_color=WHITE,
+                            width=120,
+                            font=ctk.CTkFont(size=self.font_sizes[self.current_font_size]["normal"])
+                        )
+                        control.set(setting_options[0])
+                    control.pack(side="right", padx=15)
+                
+                elif setting_type == "switch":
+                    control = ctk.CTkSwitch(
+                        item_frame,
+                        text="",
+                        progress_color=ACCENT,
+                        button_color=WHITE,
+                        button_hover_color=GRAY,
+                        width=46
+                    )
+                    control.pack(side="right", padx=15)
+                
+                elif setting_type == "button":
+                    control = ctk.CTkButton(
+                        item_frame,
+                        text=setting_options,
+                        fg_color=SURFACE,
+                        hover_color=HOVER,
+                        text_color=WHITE,
+                        width=100,
+                        height=28
+                    )
+                    control.pack(side="right", padx=15)
+
+    def show_toast(self, message, button_text=None, button_command=None):
+        """Show a toast notification with an optional button."""
+        # Create toast window
+        toast = ctk.CTkToplevel(self)
+        toast.title("")
+        toast.overrideredirect(True)  # Remove window decorations
+        toast.attributes('-topmost', True)  # Keep on top
+        toast.configure(fg_color=SURFACE)
+        
+        # Calculate position (bottom center of main window)
+        main_x = self.winfo_x()
+        main_y = self.winfo_y()
+        main_width = self.winfo_width()
+        main_height = self.winfo_height()
+        toast_width = 350
+        toast_height = 100 if button_text else 70
+        
+        # Position toast at bottom center with padding
+        x = main_x + (main_width - toast_width) // 2
+        y = main_y + main_height - toast_height - 40
+        
+        toast.geometry(f"{toast_width}x{toast_height}+{int(x)}+{int(y)}")
+        
+        # Create main container with rounded corners
+        container = ctk.CTkFrame(
+            toast,
+            fg_color=SURFACE,
+            corner_radius=12,
+            border_width=1,
+            border_color=ACCENT
+        )
+        container.pack(expand=True, fill="both", padx=2, pady=2)
+        
+        # Make container clickable
+        container.bind("<Button-1>", lambda e: button_command() if button_command else None)
+        container.configure(cursor="hand2")
+        
+        # Inner frame for content
+        inner_frame = ctk.CTkFrame(
+            container,
+            fg_color=SURFACE,
+            corner_radius=12
+        )
+        inner_frame.pack(expand=True, fill="both", padx=2, pady=2)
+        
+        # Make inner frame clickable
+        inner_frame.bind("<Button-1>", lambda e: button_command() if button_command else None)
+        inner_frame.configure(cursor="hand2")
+        
+        # Message with better formatting
+        message_parts = message.split('\n')
+        title_label = ctk.CTkLabel(
+            inner_frame,
+            text=message_parts[0],
+            font=ctk.CTkFont(size=14, weight="bold"),
+            text_color=WHITE
+        )
+        title_label.pack(pady=(15, 2))
+        
+        # Make labels clickable
+        title_label.bind("<Button-1>", lambda e: button_command() if button_command else None)
+        title_label.configure(cursor="hand2")
+        
+        if len(message_parts) > 1:
+            path_label = ctk.CTkLabel(
+                inner_frame,
+                text=message_parts[1],
+                font=ctk.CTkFont(size=12),
+                text_color=GRAY,
+                wraplength=toast_width-40
+            )
+            path_label.pack(pady=(0, 15))
+            
+            # Make path label clickable
+            path_label.bind("<Button-1>", lambda e: button_command() if button_command else None)
+            path_label.configure(cursor="hand2")
+        
+        # Fade in animation
+        toast.attributes('-alpha', 0.0)
+        for i in range(10):
+            toast.attributes('-alpha', i/10)
+            toast.update()
+            time.sleep(0.02)
+        
+        # Auto-close with fade out after 3 seconds
+        def fade_out():
+            for i in range(10, -1, -1):
+                toast.attributes('-alpha', i/10)
+                toast.update()
+                time.sleep(0.02)
+            toast.destroy()
+            
+        toast.after(2500, fade_out)
 
 if __name__ == "__main__":
     app = ZyncApp()
